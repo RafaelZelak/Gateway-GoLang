@@ -1,0 +1,8 @@
+# Register your services here
+services:
+  - route: /health
+    target: http://health_service:8000
+
+  - route: /echo
+    target: http://echo_service:9000
+
