@@ -19,7 +19,7 @@ Antes de começar, monte sua estrutura básica em nível de projeto:
 ```
 GoLang/
 │   docker-compose.yml
-│   README.md            <- Este arquivo
+│   README.md
 │
 ├───gateway/
 │       config.yml
