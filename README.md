@@ -19,7 +19,7 @@ Antes de começar, monte sua estrutura básica em nível de projeto:
 ```
 GoLang/
 │   docker-compose.yml
-│   README.md
+│   README.md            <- Este arquivo
 │
 ├───gateway/
 │       config.yml
@@ -483,12 +483,12 @@ cat logs/gateway/template_health/template_health.log
 
 ## 8. Dicas Finais
 
-- **Nomes de rota**: sempre inicie com `/`.  
-- **templateDir**: o caminho deve ser absoluto dentro do container (ex: `/root/templates/xyz`).  
-- **Log**: path absoluto no container; montamos `./logs/gateway` no host em `/var/log/gateway`.  
-- **Proxy**: se `target` tiver múltiplos URLs separados por vírgula, o Gateway faz load balancing round‑robin com health check.  
+- **Nomes de rota**: sempre inicie com `/`.
+- **templateDir**: o caminho deve ser absoluto dentro do container (ex: `/root/templates/xyz`).
+- **Log**: path absoluto no container; montamos `./logs/gateway` no host em `/var/log/gateway`.
+- **Proxy**: se `target` tiver múltiplos URLs separados por vírgula, o Gateway faz load balancing round‑robin com health check.
 
 ---
 
-**Link para download do README em formato Markdown**:  
-[Baixar README.md](sandbox:/mnt/data/README.md)  
+**Link para download do README em formato Markdown**:
+[Baixar README.md](sandbox:/mnt/data/README.md)
