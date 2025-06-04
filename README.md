@@ -16,7 +16,7 @@ Este README explica em detalhes como configurar e rodar:
 ```
 GoLang/
 │   docker-compose.yml
-│   README.md            <- Este arquivo
+│   README.md            
 │
 ├───gateway
 │       config.yml       <- Configura rotas e templates
