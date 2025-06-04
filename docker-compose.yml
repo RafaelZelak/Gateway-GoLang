@@ -10,7 +10,6 @@ services:
     depends_on:
     - health_service
     - echo_service
-    - service_test
   health_service:
     build:
       context: ./services/health_service
