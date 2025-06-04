@@ -4,12 +4,14 @@ import (
 	"context"
 	"crypto/tls"
 	"flag"
+	"html/template"
 	"io/ioutil"
 	"log"
 	"net"
 	"net/http"
 	"net/http/httputil"
 	"net/url"
+	"os"
 	"path/filepath"
 	"strings"
 	"sync/atomic"
@@ -19,25 +21,23 @@ import (
 	"gopkg.in/yaml.v3"
 )
 
-// ServiceConfig represents one entry em config.yml
 type ServiceConfig struct {
-	Route  string `yaml:"route"`  // e.g. "/health"
-	Target string `yaml:"target"` // e.g. "http://srv1:8000, http://srv2:8000"
+	Route       string `yaml:"route"`
+	Target      string `yaml:"target,omitempty"`
+	TemplateDir string `yaml:"templateDir,omitempty"`
+	Log         string `yaml:"log,omitempty"`
 }
 
-// Config mantém a lista de serviços do config.yml
 type Config struct {
 	Services []ServiceConfig `yaml:"services"`
 }
 
-// backend encapsula info de cada instância (URL, proxy e estado de saúde)
 type backend struct {
 	url     string
 	proxy   *httputil.ReverseProxy
-	healthy int32 // 1 = saudável, 0 = down
+	healthy int32
 }
 
-// lbHandler implementa round-robin considerando apenas backends saudáveis
 type lbHandler struct {
 	backends []*backend
 	counter  uint64
@@ -45,17 +45,29 @@ type lbHandler struct {
 	client   *http.Client
 }
 
-// newH2CTransport retorna um *http2.Transport configurado para h2c (HTTP/2 sem TLS)
+type templateHandler struct {
+	templates *template.Template
+}
+
+type loggingResponseWriter struct {
+	http.ResponseWriter
+	statusCode int
+}
+
+func (lrw *loggingResponseWriter) WriteHeader(code int) {
+	lrw.statusCode = code
+	lrw.ResponseWriter.WriteHeader(code)
+}
+
 func newH2CTransport() *http2.Transport {
 	return &http2.Transport{
 		AllowHTTP: true,
 		DialTLS: func(network, addr string, cfg *tls.Config) (net.Conn, error) {
-			return net.Dial(network, addr) // conexão TCP sem TLS
+			return net.Dial(network, addr)
 		},
 	}
 }
 
-// buildSingleHostProxy cria um ReverseProxy que encaminha para targetHost único
 func buildSingleHostProxy(targetHost string, transport *http2.Transport) http.Handler {
 	parsed, err := url.Parse(targetHost)
 	if err != nil {
@@ -66,11 +78,9 @@ func buildSingleHostProxy(targetHost string, transport *http2.Transport) http.Ha
 	return proxy
 }
 
-// newLBHandler recebe lista de URLs, cria um backend para cada e inicia health checks
 func newLBHandler(targets []string, transport *http2.Transport) http.Handler {
 	backends := make([]*backend, 0, len(targets))
-	// HTTP client com timeout para health check
-	httpClient := &http.Client{
+	client := &http.Client{
 		Timeout:   2 * time.Second,
 		Transport: transport,
 	}
@@ -90,7 +100,7 @@ func newLBHandler(targets []string, transport *http2.Transport) http.Handler {
 		b := &backend{
 			url:     addr,
 			proxy:   revProxy,
-			healthy: 1, // assumimos saudável inicialmente; o health check ajusta depois
+			healthy: 1,
 		}
 		backends = append(backends, b)
 	}
@@ -101,29 +111,24 @@ func newLBHandler(targets []string, transport *http2.Transport) http.Handler {
 
 	handler := &lbHandler{
 		backends: backends,
-		interval: 10 * time.Second, // intervalo para checar cada backend
-		client:   httpClient,
+		interval: 10 * time.Second,
+		client:   client,
 	}
 
-	// Inicia uma goroutine de health check para cada backend
 	for _, b := range handler.backends {
 		go handler.monitorHealth(b)
-		log.Printf("Health check iniciado para %s\n", b.url)
+		log.Printf("Health check started for %s\n", b.url)
 	}
-
 	return handler
 }
 
-// monitorHealth executa health checks periódicos em um backend
 func (l *lbHandler) monitorHealth(b *backend) {
 	for {
-		// Use contexto com timeout para não travar indefinidamente
 		ctx, cancel := context.WithTimeout(context.Background(), 2*time.Second)
-		defer cancel()
-
 		req, err := http.NewRequestWithContext(ctx, http.MethodGet, b.url, nil)
 		if err != nil {
 			atomic.StoreInt32(&b.healthy, 0)
+			cancel()
 		} else {
 			resp, err := l.client.Do(req)
 			if err != nil || resp.StatusCode >= 500 {
@@ -134,39 +139,82 @@ func (l *lbHandler) monitorHealth(b *backend) {
 			if resp != nil {
 				resp.Body.Close()
 			}
+			cancel()
 		}
-
 		time.Sleep(l.interval)
 	}
 }
 
-// ServeHTTP seleciona, em round-robin, o próximo backend saudável
 func (l *lbHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	total := uint64(len(l.backends))
 	if total == 0 {
 		http.Error(w, "Bad Gateway", http.StatusBadGateway)
 		return
 	}
-
-	// Tentamos encontrar um backend saudável em até "total" tentativas
 	for i := uint64(0); i < total; i++ {
-		// índice atômico
 		idx := atomic.AddUint64(&l.counter, 1)
 		b := l.backends[(idx-1)%total]
-
 		if atomic.LoadInt32(&b.healthy) == 1 {
-			// backend saudável encontrado; encaminha a requisição
 			b.proxy.ServeHTTP(w, r)
 			return
 		}
 	}
-
-	// Nenhum backend saudável encontrado
 	http.Error(w, "Bad Gateway: no healthy backends", http.StatusBadGateway)
 }
 
+func newTemplateHandler(dirPath string) http.Handler {
+	patterns := filepath.Join(dirPath, "*.html")
+	tmpl, err := template.ParseGlob(patterns)
+	if err != nil {
+		log.Fatalf("Error parsing templates in %s: %v", dirPath, err)
+	}
+	return &templateHandler{templates: tmpl}
+}
+
+func (th *templateHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
+	tmplName := "index.html"
+	if r.URL.Path != "" && r.URL.Path != "/" {
+		clean := strings.TrimPrefix(r.URL.Path, "/")
+		tmplName = clean + ".html"
+	}
+	if th.templates.Lookup(tmplName) == nil {
+		http.NotFound(w, r)
+		return
+	}
+	if err := th.templates.ExecuteTemplate(w, tmplName, nil); err != nil {
+		http.Error(w, "Template rendering error", http.StatusInternalServerError)
+	}
+}
+
+func sanitizeRoute(route string) string {
+	trimmed := strings.TrimPrefix(route, "/")
+	safe := strings.ReplaceAll(trimmed, "/", "_")
+	if safe == "" {
+		safe = "root"
+	}
+	return safe
+}
+
+func createLoggedHandler(handler http.Handler, logger *log.Logger, routeName string) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		start := time.Now()
+		lrw := &loggingResponseWriter{ResponseWriter: w, statusCode: http.StatusOK}
+
+		handler.ServeHTTP(lrw, r)
+
+		duration := time.Since(start)
+		logger.Printf("[%s] %s %s %s -> %d %v\n",
+			time.Now().Format(time.RFC3339),
+			r.RemoteAddr,
+			r.Method,
+			r.RequestURI,
+			lrw.statusCode,
+			duration,
+		)
+	})
+}
+
 func main() {
-	// 1) Lê caminho do config via flag (padrão "config.yml")
 	configPath := flag.String("config", "config.yml", "Path to YAML config")
 	flag.Parse()
 
@@ -175,7 +223,6 @@ func main() {
 		log.Fatalf("Failed to resolve config path: %v", err)
 	}
 
-	// 2) Carrega e faz parsing do YAML
 	data, err := ioutil.ReadFile(absConfig)
 	if err != nil {
 		log.Fatalf("Error reading config file %s: %v", absConfig, err)
@@ -185,35 +232,65 @@ func main() {
 		log.Fatalf("Error parsing YAML: %v", err)
 	}
 
-	// 3) Cria transporte HTTP/2 (h2c) para comunicação interna
 	transport := newH2CTransport()
 
 	mux := http.NewServeMux()
 	for _, svc := range cfg.Services {
-		targets := strings.Split(svc.Target, ",")
 		var handler http.Handler
 
-		if len(targets) > 1 {
-			// cria handler com load balancing e health checks
-			handler = newLBHandler(targets, transport)
-			log.Printf("Registered route %s → [load-balanced com health-check: %v]\n", svc.Route, targets)
+		if svc.TemplateDir != "" {
+			if _, err := os.Stat(svc.TemplateDir); os.IsNotExist(err) {
+				log.Fatalf("Template directory does not exist: %s", svc.TemplateDir)
+			}
+			handler = newTemplateHandler(svc.TemplateDir)
+			log.Printf("Registered route %s → [internal template: %s]\n", svc.Route, svc.TemplateDir)
+
+		} else if svc.Target != "" {
+			targets := strings.Split(svc.Target, ",")
+			if len(targets) > 1 {
+				handler = newLBHandler(targets, transport)
+				log.Printf("Registered route %s → [load-balanced: %v]\n", svc.Route, targets)
+			} else {
+				handler = buildSingleHostProxy(strings.TrimSpace(targets[0]), transport)
+				log.Printf("Registered route %s → %s\n", svc.Route, strings.TrimSpace(targets[0]))
+			}
 		} else {
-			// comportamento original (proxy único)
-			handler = buildSingleHostProxy(strings.TrimSpace(targets[0]), transport)
-			log.Printf("Registered route %s → %s\n", svc.Route, strings.TrimSpace(targets[0]))
+			log.Fatalf("Service %s must have either target or templateDir defined", svc.Route)
 		}
 
-		// registra rota sem barra final
-		mux.Handle(svc.Route, handler)
-		// registra rota com barra final
-		pattern := svc.Route
-		if !strings.HasSuffix(pattern, "/") {
-			pattern = pattern + "/"
+		if svc.Log != "" {
+			if err := os.MkdirAll(svc.Log, 0755); err != nil {
+				log.Fatalf("Failed to create log directory %s: %v", svc.Log, err)
+			}
+			routeName := sanitizeRoute(svc.Route)
+			filename := routeName + ".log"
+			pathLog := filepath.Join(svc.Log, filename)
+			f, err := os.OpenFile(pathLog, os.O_CREATE|os.O_APPEND|os.O_WRONLY, 0644)
+			if err != nil {
+				log.Fatalf("Failed to open log file %s: %v", pathLog, err)
+			}
+			logger := log.New(f, "", 0)
+			handler = createLoggedHandler(handler, logger, routeName)
+			log.Printf("Logging enabled for route %s → %s\n", svc.Route, pathLog)
 		}
-		mux.Handle(pattern, handler)
+
+		if svc.TemplateDir != "" {
+			mux.Handle(svc.Route, http.StripPrefix(svc.Route, handler))
+			pattern := svc.Route
+			if !strings.HasSuffix(pattern, "/") {
+				pattern = pattern + "/"
+			}
+			mux.Handle(pattern, http.StripPrefix(pattern, handler))
+		} else {
+			mux.Handle(svc.Route, handler)
+			pattern := svc.Route
+			if !strings.HasSuffix(pattern, "/") {
+				pattern = pattern + "/"
+			}
+			mux.Handle(pattern, handler)
+		}
 	}
 
-	// catch-all devolve 404
 	mux.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
 		http.NotFound(w, r)
 	})
@@ -226,6 +303,6 @@ func main() {
 		IdleTimeout:  60 * time.Second,
 	}
 
-	log.Println("API Gateway listening on :80 com health checks para backends")
+	log.Println("API Gateway listening on :80 (h2c) with internal templates support")
 	log.Fatal(server.ListenAndServe())
 }

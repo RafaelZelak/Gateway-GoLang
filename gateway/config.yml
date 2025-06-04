@@ -1,8 +1,9 @@
-# Register your services here
+
 services:
   - route: /health
     target: http://health_service:8000
+    log: /var/log/gateway/health
 
-  - route: /echo
-    target: http://echo_service:9000
-
+  - route: /template_health
+    templateDir: /root/templates/template_health
+    log: /var/log/gateway/template_health

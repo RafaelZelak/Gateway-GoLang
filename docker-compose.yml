@@ -1,26 +1,23 @@
-version: '3.8'
+version: "3.8"
+
 services:
-  gateway:
+  go_gateway:
     build:
       context: ./gateway
       dockerfile: Dockerfile
-    container_name: go_gateway
+    image: golang-gateway:latest
     ports:
-    - 8080:80
+      - "8080:80"
+    volumes:
+      - ./templates:/root/templates
+      - ./logs/gateway:/var/log/gateway
     depends_on:
-    - health_service
-    - echo_service
+      - health_service
+
   health_service:
     build:
       context: ./services/health_service
       dockerfile: Dockerfile
-    container_name: health_service
+    image: golang-health_service:latest
     ports:
-    - 8000:8000
-  echo_service:
-    build:
-      context: ./services/echo_service
-      dockerfile: Dockerfile
-    container_name: echo_service
-    ports:
-    - 9000:9000
+      - "8000:8000"
