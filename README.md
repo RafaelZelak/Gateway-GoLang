@@ -1,4 +1,3 @@
-
 # Guia Completo: Criando Serviços e Templates no API Gateway
 
 Este documento explica passo a passo como criar **do zero** cada componente do projeto:
@@ -425,6 +424,7 @@ No **`gateway/main.go`**, a lógica principal:
    - route: /novo_template
      templateDir: /root/templates/novo_template
      log: /var/log/gateway/novo_template
+     auth: public
    ```
 
 4. **Diretórios de logs**:
@@ -492,3 +492,55 @@ cat logs/gateway/template_health/template_health.log
 
 **Link para download do README em formato Markdown**:
 [Baixar README.md](sandbox:/mnt/data/README.md)
+---
+
+## 9. Autenticação via JWT com `auth: private`
+
+O Gateway agora permite proteger rotas com autenticação por token JWT, assinados com chave secreta segura. O controle é feito via `auth: private` no `config.yml`.
+
+### 9.1. Como funciona
+
+- Rotas com `auth: public` são abertas, sem exigência de autenticação.
+- Rotas com `auth: private` exigem um token JWT válido no header:
+
+```http
+Authorization: Bearer <token>
+```
+
+### 9.2. Obtendo o token
+
+Para obter um token JWT válido, faça uma requisição GET para:
+
+```bash
+curl "http://localhost:8080/auth?login=admin&password=senha123"
+```
+
+Resposta esperada:
+
+```json
+{"token":"<jwt_assinado>"}
+```
+
+Esse token pode ser usado nas rotas protegidas do Gateway.
+
+### 9.3. Configuração necessária
+
+Adicione ao seu `docker-compose.yml`:
+
+```yaml
+environment:
+  - GATEWAY_USER=admin
+  - GATEWAY_PASS=senha123
+  - GATEWAY_JWT_SECRET=chaveUltraSeguraAqui
+```
+
+A chave `GATEWAY_JWT_SECRET` será usada internamente para assinar o token.
+
+> Use uma chave forte gerada, por exemplo, com:
+> `openssl rand -base64 32`
+
+### 9.4. Segurança do JWT
+
+- **JWT não é criptografado**, apenas **assinado**.
+- O conteúdo pode ser lido, mas **não pode ser modificado** sem invalidar a assinatura.
+- O segredo usado na assinatura **não é incluído no token**.

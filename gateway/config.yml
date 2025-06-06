@@ -3,7 +3,20 @@ services:
   - route: /health
     target: http://health_service:8000
     log: /var/log/gateway/health
+    auth: public
+
+  - route: /clock
+    target: ws://clock_service:9001
+    log: /var/log/gateway/clock
+    auth: public
+
+  - route: /secure
+    target: http://secure_service:9000
+    log: /var/log/gateway/secure
+    auth: private
 
   - route: /template_health
     templateDir: /root/templates/template_health
-    log: /var/log/gateway/template_health
+    templateRoutes:
+      contato: contact.html
+      sobre: about.html

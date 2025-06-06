@@ -1,6 +1,7 @@
 from fastapi import FastAPI
 
 app = FastAPI()
-@app.get("/health")
+
+@app.get("/secure")
 async def health():
-    return {"status": "It's alive!"}
+    return {"status": "ROTA SEGURA!"}

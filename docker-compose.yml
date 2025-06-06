@@ -11,8 +11,14 @@ services:
     volumes:
       - ./templates:/root/templates
       - ./logs/gateway:/var/log/gateway
+    environment:
+      - GATEWAY_USER=admin
+      - GATEWAY_PASS=C4lv0kkk
+      - GATEWAY_JWT_SECRET=chaveUltraSeguraAqui
     depends_on:
       - health_service
+      - secure_service
+      - clock_service
 
   health_service:
     build:
@@ -21,3 +27,19 @@ services:
     image: golang-health_service:latest
     ports:
       - "8000:8000"
+
+  secure_service:
+    build:
+      context: ./services/secure_service
+      dockerfile: Dockerfile
+    image: golang-secure_service:latest
+    ports:
+      - "9000:9000"
+
+  clock_service:
+    build:
+      context: ./services/clock_service
+      dockerfile: Dockerfile
+    image: golang-clock_service:latest
+    ports:
+      - "9001:9001"

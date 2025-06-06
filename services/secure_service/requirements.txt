@@ -2,4 +2,3 @@ fastapi
 uvicorn
 hypercorn
 uvloop
-pytz
