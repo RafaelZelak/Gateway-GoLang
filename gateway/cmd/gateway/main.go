@@ -2,28 +2,34 @@ package main
 
 import (
 	"log"
+	"net"
 	"net/http"
 	"time"
 
 	"github.com/RafaelZelak/gateway/internal/config"
 	"github.com/RafaelZelak/gateway/internal/router"
+	"golang.org/x/net/netutil"
 )
 
 func main() {
-	// Load configuration from YAML
 	cfg, err := config.LoadConfig("config.yml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
 	}
 
-	// Build the router with all routes and middlewares
 	mux, err := router.NewRouter(cfg)
 	if err != nil {
 		log.Fatalf("Failed to create router: %v", err)
 	}
 
+	listener, err := net.Listen("tcp", ":80")
+	if err != nil {
+		log.Fatalf("Listen error: %v", err)
+	}
+
+	listener = netutil.LimitListener(listener.(*net.TCPListener), 100)
+
 	server := &http.Server{
-		Addr:         ":80",
 		Handler:      mux,
 		ReadTimeout:  10 * time.Second,
 		WriteTimeout: 10 * time.Second,
@@ -31,5 +37,5 @@ func main() {
 	}
 
 	log.Println("API Gateway listening on :80")
-	log.Fatal(server.ListenAndServe())
+	log.Fatal(server.Serve(listener))
 }
