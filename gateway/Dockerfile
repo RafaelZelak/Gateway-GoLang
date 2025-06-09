@@ -1,25 +1,27 @@
-
+# Build stage: use Go 1.24 to satisfy "go mod requires go >= 1.24"
 FROM golang:1.24-alpine AS builder
 
 WORKDIR /app
 
+# Copy go.mod and go.sum, then download dependencies
 COPY go.mod go.sum ./
 RUN go mod download
 
+# Copy all source files and build the binary
 COPY . .
+RUN CGO_ENABLED=0 GOOS=linux go build -o gateway ./cmd/gateway
 
-RUN CGO_ENABLED=0 GOOS=linux go build -o go_gateway .
+# Final stage: minimal runtime image
+FROM alpine:3.18
 
-FROM alpine:latest
-
+# Install CA certificates for HTTPS support
 RUN apk add --no-cache ca-certificates
 
-WORKDIR /root
-
-COPY --from=builder /app/go_gateway .
-
-COPY --from=builder /app/config.yml .
+WORKDIR /root/
+# Copy compiled binary and configuration file
+COPY --from=builder /app/gateway .
+COPY config.yml .
 
 EXPOSE 80
 
-CMD ["./go_gateway", "--config", "config.yml"]
+CMD ["./gateway"]

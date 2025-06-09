@@ -1,18 +1,17 @@
-
 services:
   - route: /health
     target: http://health_service:8000
-    log: /var/log/gateway/health
+    log: /var/log/gateway/health/health.log
     auth: public
 
   - route: /clock
     target: ws://clock_service:9001
-    log: /var/log/gateway/clock
+    log: /var/log/gateway/clock/clock.log
     auth: public
 
   - route: /secure
     target: http://secure_service:9000
-    log: /var/log/gateway/secure
+    log: /var/log/gateway/secure/secure.log
     auth: private
 
   - route: /template_health
@@ -20,3 +19,5 @@ services:
     templateRoutes:
       contato: contact.html
       sobre: about.html
+    log: /var/log/gateway/template_health/template_health.log
+    auth: public
