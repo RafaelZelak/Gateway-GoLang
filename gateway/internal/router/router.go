@@ -1,4 +1,3 @@
-// internal/router/router.go
 package router
 
 import (
@@ -25,6 +24,16 @@ func NewRouter(cfg *config.Config) (*http.ServeMux, error) {
 		isWS := strings.HasPrefix(strings.TrimSpace(svc.Target), "ws://")
 
 		if svc.TemplateDir != "" {
+			route := strings.TrimRight(svc.Route, "/")
+
+			// serve CSS static files
+			stylesPath := filepath.Join(svc.TemplateDir, "styles")
+			mux.Handle(route+"/styles/", http.StripPrefix(route+"/styles/", http.FileServer(http.Dir(stylesPath))))
+
+			// serve JS static files
+			scriptsPath := filepath.Join(svc.TemplateDir, "scripts")
+			mux.Handle(route+"/scripts/", http.StripPrefix(route+"/scripts/", http.FileServer(http.Dir(scriptsPath))))
+
 			// template handler
 			tmplHandler, err := template.NewTemplateHandler(svc.TemplateDir, svc.Route, svc.TemplateRoutes)
 			if err != nil {
@@ -37,13 +46,10 @@ func NewRouter(cfg *config.Config) (*http.ServeMux, error) {
 			first := strings.TrimSpace(targets[0])
 
 			if isWS {
-				// WebSocket proxy (sem logging middleware)
 				handler = proxy.NewWebSocketProxyHandler(svc.Route, first)
 			} else if len(targets) > 1 {
-				// HTTP load-balancer
 				handler = proxy.BuildLoadBalancer(targets, restTransport)
 			} else {
-				// single HTTP reverse proxy
 				p, err := proxy.BuildReverseProxy(first, restTransport)
 				if err != nil {
 					return nil, err
@@ -52,12 +58,21 @@ func NewRouter(cfg *config.Config) (*http.ServeMux, error) {
 			}
 		}
 
-		// apply auth if needed
-		if svc.Auth == "private" {
+		if svc.Login {
+			// register login endpoint
+			mux.Handle(svc.Route+"/login", auth.LoginHandler(svc.Route, svc.SessionDuration))
+			mux.Handle(svc.Route+"/login/", auth.LoginHandler(svc.Route, svc.SessionDuration))
+			// register logout endpoint
+			mux.Handle(svc.Route+"/logout", auth.LogoutHandler(svc.Route))
+			mux.Handle(svc.Route+"/logout/", auth.LogoutHandler(svc.Route))
+			// protect all other endpoints under svc.Route
+			handler = auth.SessionMiddleware(svc.Route, svc.SessionDuration)(handler)
+
+		} else if svc.Auth == "private" {
 			handler = auth.Middleware(handler)
 		}
 
-		// prepare log directory/file
+		// ensure log directory exists
 		logDir := filepath.Dir(svc.Log)
 		if err := os.MkdirAll(logDir, 0o755); err != nil {
 			return nil, err
@@ -68,12 +83,12 @@ func NewRouter(cfg *config.Config) (*http.ServeMux, error) {
 		}
 		logger := log.New(logFile, "", 0)
 
-		// only apply logging middleware on non-WS routes
+		// apply logging middleware for non-WS routes
 		if !isWS {
 			handler = middleware.LoggingMiddleware(handler, logger, svc.Route)
 		}
 
-		// register with and without trailing slash
+		// register main handler (with and without trailing slash)
 		mux.Handle(svc.Route, handler)
 		mux.Handle(svc.Route+"/", handler)
 

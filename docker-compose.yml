@@ -1,3 +1,5 @@
+# docker-compose.yml
+
 version: "3.8"
 
 services:
@@ -7,18 +9,25 @@ services:
       dockerfile: Dockerfile
     image: golang-gateway:latest
     ports:
-      - "8080:80"
+      - "8080:8080"
     volumes:
       - ./templates:/root/templates
       - ./logs/gateway:/var/log/gateway
+    # Adicione esta seção para carregar o arquivo .env
+    env_file:
+      - .env
+    # A seção 'environment' pode ser mantida se você precisar sobrescrever
+    # ou adicionar variáveis específicas que não estão no .env
     environment:
-      - GATEWAY_USER=admin
-      - GATEWAY_PASS=C4lv0kkk
-      - GATEWAY_JWT_SECRET=chaveUltraSeguraAqui
+      - GATEWAY_JWT_SECRET=chaveUltraSeguraAqui # Exemplo: pode estar no .env ou aqui
     depends_on:
       - health_service
       - secure_service
       - clock_service
+    # Adicione a seção dns aqui para resolver o hostname do LDAP
+    dns:
+      - "192.168.15.254"  # IP do seu servidor DNS primário
+      - "192.168.15.1"   # IP do seu servidor DNS secundário
 
   health_service:
     build:

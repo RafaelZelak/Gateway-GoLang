@@ -3,64 +3,10 @@
 <head>
   <meta charset="UTF-8">
   <title>Relógio em Tempo Real</title>
-  <style>
-    body {
-      font-family: sans-serif;
-      background: #0d1117;
-      color: #c9d1d9;
-      display: flex;
-      justify-content: center;
-      align-items: center;
-      height: 100vh;
-      margin: 0;
-    }
-
-    #clock {
-      font-family: monospace;
-      font-size: 3em;
-      background: #161b22;
-      padding: 20px 40px;
-      border-radius: 8px;
-      box-shadow: 0 0 12px rgba(0,0,0,0.5);
-      user-select: text;
-      cursor: text;
-      line-height: 1;
-    }
-  </style>
+  <link rel="stylesheet" href="/template_health/styles/index.css">
 </head>
 <body>
-
   <div id="clock"></div>
-
-  <script>
-    function startClock() {
-      const clock = document.getElementById("clock");
-      const textNode = document.createTextNode("Conectando...");
-      clock.textContent = ""; // limpa qualquer resíduo
-      clock.appendChild(textNode);
-
-      const socket = new WebSocket("ws://localhost:8080/clock");
-
-      socket.onopen = () => {
-        textNode.nodeValue = "Conectado...";
-      };
-
-      socket.onmessage = (event) => {
-        const data = JSON.parse(event.data);
-        textNode.nodeValue = data.time;
-      };
-
-      socket.onerror = () => {
-        textNode.nodeValue = "Erro na conexão";
-      };
-
-      socket.onclose = () => {
-        textNode.nodeValue = "Reconectando...";
-        setTimeout(startClock, 1000);
-      };
-    }
-
-    startClock();
-  </script>
+  <script src="/template_health/scripts/index.js"></script>
 </body>
 </html>

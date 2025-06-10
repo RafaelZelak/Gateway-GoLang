@@ -2,16 +2,25 @@ package auth
 
 import (
 	"net/http"
-	"os"
 	"strings"
+	"sync"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// jwtKey holds the secret for signing tokens
-var jwtKey = []byte(os.Getenv("GATEWAY_JWT_SECRET"))
+var (
+	jwtKey     []byte
+	jwtKeyOnce sync.Once
+)
 
-// Middleware checks for valid JWT if route is protected
+func getJWTKey() []byte {
+	jwtKeyOnce.Do(func() {
+		jwtKey = []byte("C4lv0kkk")
+	})
+	return jwtKey
+}
+
+// Middleware checks for valid JWT in Authorization header.
 func Middleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		tokenStr := extractToken(r)
@@ -22,7 +31,7 @@ func Middleware(next http.Handler) http.Handler {
 
 		claims := &jwt.RegisteredClaims{}
 		_, err := jwt.ParseWithClaims(tokenStr, claims, func(token *jwt.Token) (interface{}, error) {
-			return jwtKey, nil
+			return getJWTKey(), nil
 		})
 		if err != nil {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -33,11 +42,10 @@ func Middleware(next http.Handler) http.Handler {
 	})
 }
 
-// extractToken fetches the Bearer token from Authorization header
 func extractToken(r *http.Request) string {
-	header := r.Header.Get("Authorization")
-	if header == "" || !strings.HasPrefix(header, "Bearer ") {
+	h := r.Header.Get("Authorization")
+	if h == "" || !strings.HasPrefix(h, "Bearer ") {
 		return ""
 	}
-	return strings.TrimPrefix(header, "Bearer ")
+	return strings.TrimPrefix(h, "Bearer ")
 }

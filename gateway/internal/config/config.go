@@ -10,12 +10,14 @@ import (
 
 // ServiceConfig represents each entry in config.yml
 type ServiceConfig struct {
-	Route          string            `yaml:"route"`
-	Target         string            `yaml:"target,omitempty"`
-	TemplateDir    string            `yaml:"templateDir,omitempty"`
-	TemplateRoutes map[string]string `yaml:"templateRoutes,omitempty"`
-	Log            string            `yaml:"log,omitempty"`
-	Auth           string            `yaml:"auth,omitempty"`
+	Route           string            `yaml:"route"`
+	Target          string            `yaml:"target,omitempty"`
+	TemplateDir     string            `yaml:"templateDir,omitempty"`
+	TemplateRoutes  map[string]string `yaml:"templateRoutes,omitempty"`
+	Log             string            `yaml:"log,omitempty"`
+	Auth            string            `yaml:"auth,omitempty"`
+	Login           bool              `yaml:"login,omitempty"`
+	SessionDuration int               `yaml:"session_duration,omitempty"`
 }
 
 // Config holds all service configurations

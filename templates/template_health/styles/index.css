@@ -1,0 +1,25 @@
+/* Base layout */
+body {
+  font-family: sans-serif;
+  background: #0d1117;
+  color: #c9d1d9;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  height: 100vh;
+  margin: 0;
+}
+
+/* Clock appearance */
+#clock {
+  font-family: monospace;
+  font-size: 3em;
+  background: #161b22;
+  padding: 20px 40px;
+  border-radius: 8px;
+  box-shadow: 0 0 12px rgba(0,0,0,0.5);
+  user-select: text;
+  cursor: text;
+  line-height: 1;
+}
+

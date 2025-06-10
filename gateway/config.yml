@@ -21,3 +21,5 @@ services:
       sobre: about.html
     log: /var/log/gateway/template_health/template_health.log
     auth: public
+    login: true
+    session_duration: 3600

@@ -2,17 +2,18 @@ package main
 
 import (
 	"log"
-	"net"
 	"net/http"
-	"time"
 
 	"github.com/RafaelZelak/gateway/internal/config"
 	"github.com/RafaelZelak/gateway/internal/router"
-	"github.com/RafaelZelak/gateway/pkg/middleware"
-	"golang.org/x/net/netutil"
+	"github.com/joho/godotenv"
 )
 
 func main() {
+	if err := godotenv.Load(); err != nil {
+		log.Printf(".env not found, relying on environment variables: %v", err)
+	}
+
 	cfg, err := config.LoadConfig("config.yml")
 	if err != nil {
 		log.Fatalf("Failed to load config: %v", err)
@@ -23,23 +24,12 @@ func main() {
 		log.Fatalf("Failed to create router: %v", err)
 	}
 
-	// Wrap with CORS, CSP (inline), JSON-404
-	handler := middleware.WrapMux(mux)
-
-	listener, err := net.Listen("tcp", ":80")
-	if err != nil {
-		log.Fatalf("Listen error: %v", err)
+	port := "8080"
+	if port == "" {
+		port = "80"
 	}
-	// limit to 100 simultaneous connections
-	listener = netutil.LimitListener(listener.(*net.TCPListener), 100)
-
-	server := &http.Server{
-		Handler:      handler,
-		ReadTimeout:  10 * time.Second,
-		WriteTimeout: 10 * time.Second,
-		IdleTimeout:  60 * time.Second,
+	log.Printf("Starting server on port %s", port)
+	if err := http.ListenAndServe(":"+port, mux); err != nil {
+		log.Fatalf("Server failed: %v", err)
 	}
-
-	log.Println("API Gateway listening on :80")
-	log.Fatal(server.Serve(listener))
 }
