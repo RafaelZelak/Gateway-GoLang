@@ -2,7 +2,6 @@ package auth
 
 import (
 	"fmt"
-	"log"
 	"strings"
 
 	"github.com/go-ldap/ldap/v3"
@@ -26,7 +25,6 @@ func Authenticate(username, password string) (*UserInfo, error) {
 		ldapPort = "389"
 	}
 	addr := fmt.Sprintf("%s:%s", ldapHost, ldapPort)
-	log.Printf("Connecting to LDAP at %s", addr)
 
 	// 2) Dial no endereço correto
 	l, err := ldap.Dial("tcp", addr)

@@ -1,0 +1,4 @@
+jobs:
+  - job: job_example
+    target: ./jobs/job_example/run.py
+    cron: "* * * * *"

@@ -39,7 +39,6 @@ func SessionMiddleware(baseRoute string, duration int) func(http.Handler) http.H
 	}
 }
 
-// LoginHandler serves the embedded login page and processes POST.
 func LoginHandler(baseRoute string, duration int) http.Handler {
 	// this reads embedded internal/auth/templates/login.html
 	tpl := template.Must(template.ParseFS(loginFS, "templates/login.html"))
@@ -51,7 +50,7 @@ func LoginHandler(baseRoute string, duration int) http.Handler {
 		}
 		user := r.FormValue("username")
 		pass := r.FormValue("password")
-		log.Printf("LoginHandler received user=%q, password=%q", user, pass)
+		log.Printf("[LOG] login: user=%q", user)
 
 		info, err := Authenticate(user, pass)
 		if err != nil {
