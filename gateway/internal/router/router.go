@@ -67,9 +67,6 @@ func NewRouter(cfg *config.Config) (*http.ServeMux, error) {
 			mux.Handle(svc.Route+"/logout/", auth.LogoutHandler(svc.Route))
 			// protect all other endpoints under svc.Route
 			handler = auth.SessionMiddleware(svc.Route, svc.SessionDuration)(handler)
-
-		} else if svc.Auth == "private" {
-			handler = auth.Middleware(handler)
 		}
 
 		// ensure log directory exists

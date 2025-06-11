@@ -13,21 +13,13 @@ services:
     volumes:
       - ./templates:/root/templates
       - ./logs/gateway:/var/log/gateway
-    # Adicione esta seção para carregar o arquivo .env
     env_file:
       - .env
-    # A seção 'environment' pode ser mantida se você precisar sobrescrever
-    # ou adicionar variáveis específicas que não estão no .env
     environment:
-      - GATEWAY_JWT_SECRET=chaveUltraSeguraAqui # Exemplo: pode estar no .env ou aqui
+      - GATEWAY_JWT_SECRET=C4lv0kkk
     depends_on:
       - health_service
-      - secure_service
       - clock_service
-    # Adicione a seção dns aqui para resolver o hostname do LDAP
-    dns:
-      - "192.168.15.254"  # IP do seu servidor DNS primário
-      - "192.168.15.1"   # IP do seu servidor DNS secundário
 
   health_service:
     build:
@@ -36,14 +28,6 @@ services:
     image: golang-health_service:latest
     ports:
       - "8000:8000"
-
-  secure_service:
-    build:
-      context: ./services/secure_service
-      dockerfile: Dockerfile
-    image: golang-secure_service:latest
-    ports:
-      - "9000:9000"
 
   clock_service:
     build:

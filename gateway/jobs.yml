@@ -1,4 +1,4 @@
 jobs:
   - job: job_example
     target: ./jobs/job_example/run.py
-    cron: "* * * * *"
+    cron: "0 */1 * * *"

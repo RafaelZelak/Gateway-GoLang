@@ -10,14 +10,15 @@ import (
 	"github.com/golang-jwt/jwt/v5"
 )
 
-// Claims holds username and scope.
+var jwtKey = []byte("C4lv0kkk")
+
 type Claims struct {
 	Username string `json:"username"`
 	Scope    string `json:"scope"`
 	jwt.RegisteredClaims
 }
 
-// SessionMiddleware protects the service routes.
+// SessionMiddleware protege todas as rotas que exigem login.
 func SessionMiddleware(baseRoute string, duration int) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -39,8 +40,9 @@ func SessionMiddleware(baseRoute string, duration int) func(http.Handler) http.H
 	}
 }
 
+// LoginHandler serve a página de login e gera o cookie JWT.
 func LoginHandler(baseRoute string, duration int) http.Handler {
-	// this reads embedded internal/auth/templates/login.html
+	// lê o template embarcado em internal/auth/templates/login.html
 	tpl := template.Must(template.ParseFS(loginFS, "templates/login.html"))
 
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
@@ -82,7 +84,7 @@ func LoginHandler(baseRoute string, duration int) http.Handler {
 	})
 }
 
-// LogoutHandler clears the session and redirects to login.
+// LogoutHandler limpa o cookie de sessão.
 func LogoutHandler(baseRoute string) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		http.SetCookie(w, &http.Cookie{

@@ -15,7 +15,6 @@ type ServiceConfig struct {
 	TemplateDir     string            `yaml:"templateDir,omitempty"`
 	TemplateRoutes  map[string]string `yaml:"templateRoutes,omitempty"`
 	Log             string            `yaml:"log,omitempty"`
-	Auth            string            `yaml:"auth,omitempty"`
 	Login           bool              `yaml:"login,omitempty"`
 	SessionDuration int               `yaml:"session_duration,omitempty"`
 }
